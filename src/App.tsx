@@ -11,6 +11,7 @@ import {
   Plus,
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import * as XLSXStyle from "xlsx-js-style";
 
 // Types
 type ContactStatus =
@@ -27,26 +28,21 @@ interface Contact {
   status: ContactStatus;
   customMessage?: string;
   timerActive?: boolean;
-  extraInfo?: Record<string, any>; // Campos adicionais da planilha
+  extraInfo?: Record<string, any>;
 }
 
-// Utility functions
 const generateId = () =>
   `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 const cleanPhoneNumber = (phone: string): string => {
-  // Remove todos os caracteres não numéricos
   let cleaned = String(phone).replace(/\D/g, "");
 
-  // Remove zeros à esquerda se houver
   cleaned = cleaned.replace(/^0+/, "");
 
-  // Se não começar com código do país, adiciona 55 (Brasil)
   if (!cleaned.startsWith("55") && cleaned.length <= 11) {
     cleaned = "55" + cleaned;
   }
 
-  // Valida se tem pelo menos 12 dígitos (55 + DDD + número)
   if (cleaned.length < 12) {
     throw new Error(`Número de telefone inválido: ${phone}`);
   }
@@ -69,6 +65,52 @@ const replacePlaceholders = (template: string, contact: Contact) => {
   return template
     .replace(/{name}/g, contact.name)
     .replace(/{phone}/g, contact.phone);
+};
+
+const formatExcelDate = (value: any): string => {
+  if (
+    typeof value === "string" &&
+    (value.includes("/") || value.includes("-"))
+  ) {
+    return value;
+  }
+
+  if (typeof value === "number" && value > 1000) {
+    const excelEpoch = new Date(1900, 0, 1);
+    const daysOffset = value - 2;
+    const date = new Date(
+      excelEpoch.getTime() + daysOffset * 24 * 60 * 60 * 1000
+    );
+
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+
+  return String(value);
+};
+
+const formatCurrency = (value: any): string => {
+  const numValue =
+    typeof value === "number"
+      ? value
+      : parseFloat(
+          String(value)
+            .replace(/[^\d,-]/g, "")
+            .replace(",", ".")
+        );
+
+  if (isNaN(numValue)) {
+    return String(value);
+  }
+
+  return numValue.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 };
 
 function App() {
@@ -104,7 +146,6 @@ function App() {
     }
   }, []);
 
-  // Save to localStorage
   useEffect(() => {
     if (contacts.length > 0 || hasChanges) {
       localStorage.setItem("contacts_v1", JSON.stringify(contacts));
@@ -113,7 +154,6 @@ function App() {
     }
   }, [contacts, defaultMessage, timerSeconds, hasChanges]);
 
-  // Prevent page refresh/close
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (contacts.length > 0) {
@@ -177,11 +217,9 @@ function App() {
           const data = e.target?.result;
           const workbook = XLSX.read(data, { type: "binary" });
 
-          // Pega a primeira planilha
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
 
-          // Converte para JSON
           const jsonData = XLSX.utils.sheet_to_json(worksheet, {
             header: 1,
           }) as any[][];
@@ -190,12 +228,10 @@ function App() {
             throw new Error("Planilha vazia ou sem dados");
           }
 
-          // Pega o cabeçalho (primeira linha)
           const headers = jsonData[0].map((h: any) =>
             String(h).toLowerCase().trim()
           );
 
-          // Encontra os índices das colunas Nome e Telefone
           const nameIndex = headers.findIndex(
             (h: string) => h.includes("nome") || h === "name"
           );
@@ -212,7 +248,6 @@ function App() {
             );
           }
 
-          // Processa as linhas (pula o cabeçalho)
           const contacts: Contact[] = [];
           const errors: string[] = [];
 
@@ -221,14 +256,23 @@ function App() {
             const name = row[nameIndex];
             const phone = row[phoneIndex];
 
-            // Pula linhas vazias
             if (!name || !phone) continue;
 
             try {
-              // Captura todos os campos extras (exceto nome e telefone)
               const extraInfo: Record<string, any> = {};
-              headers.forEach((header: string, index: number) => {
-                if (index !== nameIndex && index !== phoneIndex && row[index]) {
+              // Usar headers ORIGINAIS (não lowercase) para preservar case
+              const originalHeaders = jsonData[0].map((h: any) =>
+                String(h).trim()
+              );
+
+              originalHeaders.forEach((header: string, index: number) => {
+                if (
+                  index !== nameIndex &&
+                  index !== phoneIndex &&
+                  row[index] !== undefined &&
+                  row[index] !== null &&
+                  row[index] !== ""
+                ) {
                   extraInfo[header] = row[index];
                 }
               });
@@ -260,7 +304,6 @@ function App() {
             );
           }
 
-          // Mostra avisos se houver erros parciais
           if (errors.length > 0) {
             console.warn("Alguns contatos não puderam ser importados:", errors);
           }
@@ -285,13 +328,11 @@ function App() {
 
     try {
       if (isExcel) {
-        // Processa arquivo Excel
         const newContacts = await parseExcelFile(file);
         setContacts(newContacts);
         setHasChanges(true);
         showSuccess(`${newContacts.length} contatos importados do Excel!`);
       } else if (isJson) {
-        // Processa arquivo JSON (lógica antiga)
         const reader = new FileReader();
         reader.onload = (event) => {
           try {
@@ -434,11 +475,29 @@ function App() {
     }
 
     try {
+      const extraInfo: Record<string, any> = {
+        "data de envio": "",
+        "Comercial Responsável": "",
+        "E-mail": "",
+        Nome: newContactName.trim(),
+        Telefone: cleanPhoneNumber(newContactPhone),
+        Empresa: "",
+        "Qual seu CNPJ": "",
+        "Qualificado para CLT (sim/não)": "",
+        Volume: "",
+        "Follow Up WhatsApp": "",
+        "Autoriza conexão parceiros": "",
+        "Opera com quem?": "",
+        "Encaminhado para parceiro UY3": "",
+        "Obs:": "",
+      };
+
       const newContact: Contact = {
         id: generateId(),
         name: newContactName.trim(),
         phone: cleanPhoneNumber(newContactPhone),
         status: "Pendente",
+        extraInfo,
       };
 
       setContacts((prev) => [newContact, ...prev]);
@@ -450,6 +509,141 @@ function App() {
     } catch (err) {
       showError(
         err instanceof Error ? err.message : "Erro ao adicionar contato"
+      );
+    }
+  };
+
+  const exportToExcel = () => {
+    if (contacts.length === 0) {
+      showError("Não há contatos para exportar");
+      return;
+    }
+
+    try {
+      const convertExcelDate = (value: any): any => {
+        if (typeof value === "number" && value > 1000 && value < 100000) {
+          const excelEpoch = new Date(1900, 0, 1);
+          const daysOffset = value - 2;
+          const date = new Date(
+            excelEpoch.getTime() + daysOffset * 24 * 60 * 60 * 1000
+          );
+          const day = String(date.getDate()).padStart(2, "0");
+          const month = String(date.getMonth() + 1).padStart(2, "0");
+          const year = date.getFullYear();
+          return `${day}/${month}/${year}`;
+        }
+        return value;
+      };
+
+      const exportData = contacts.map((contact) => {
+        const rowData: Record<string, any> = {};
+        let followUpAdded = false;
+
+        if (contact.extraInfo) {
+          Object.entries(contact.extraInfo).forEach(([key, value]) => {
+            const lowerKey = key.toLowerCase();
+
+            if (
+              lowerKey.includes("follow up") ||
+              lowerKey.includes("followup")
+            ) {
+              return;
+            }
+
+            const originalKey = key;
+
+            let formattedValue = value;
+
+            if (
+              lowerKey.includes("data") ||
+              lowerKey.includes("date") ||
+              lowerKey.includes("envio")
+            ) {
+              formattedValue = convertExcelDate(value);
+            } else if (lowerKey.includes("cnpj")) {
+              formattedValue = String(value).replace(/\D/g, "");
+            }
+
+            rowData[originalKey] = formattedValue;
+
+            if (lowerKey.includes("volume") && !followUpAdded) {
+              rowData["Follow UP - 18-11-2025"] = contact.status;
+              followUpAdded = true;
+            }
+          });
+        }
+
+        if (!followUpAdded) {
+          rowData["Follow UP - 18-11-2025"] = contact.status;
+        }
+
+        return rowData;
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+      const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
+
+      const colWidths: { wch: number }[] = [];
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        let maxWidth = 10;
+
+        for (let row = range.s.r; row <= range.e.r; row++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+          const cell = worksheet[cellAddress];
+
+          if (cell && cell.v) {
+            const cellLength = String(cell.v).length;
+            maxWidth = Math.max(maxWidth, cellLength);
+          }
+        }
+
+        colWidths.push({ wch: Math.min(maxWidth + 2, 50) });
+      }
+
+      worksheet["!cols"] = colWidths;
+
+      const workbook = XLSX.utils.book_new();
+
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+        if (!worksheet[cellAddress]) continue;
+
+        worksheet[cellAddress].s = {
+          font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } },
+          fill: {
+            patternType: "solid",
+            fgColor: { rgb: "FF8C00" },
+            bgColor: { rgb: "FF8C00" },
+          },
+          alignment: {
+            horizontal: "center",
+            vertical: "center",
+            wrapText: false,
+          },
+          border: {
+            top: { style: "thin", color: { rgb: "000000" } },
+            bottom: { style: "thin", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "000000" } },
+            right: { style: "thin", color: { rgb: "000000" } },
+          },
+        };
+      }
+
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Contatos");
+
+      const now = new Date();
+      const fileName = `contatos_${now.getFullYear()}-${String(
+        now.getMonth() + 1
+      ).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(
+        now.getHours()
+      ).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}.xlsx`;
+
+      XLSXStyle.writeFile(workbook, fileName);
+      showSuccess(`${contacts.length} contatos exportados com sucesso!`);
+    } catch (err) {
+      showError(
+        err instanceof Error ? err.message : "Erro ao exportar contatos"
       );
     }
   };
@@ -482,9 +676,20 @@ function App() {
 
         {/* Import Section */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8 border border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">
-            Importar Contatos
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-800">
+              Importar Contatos
+            </h2>
+            <button
+              onClick={exportToExcel}
+              disabled={contacts.length === 0}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2"
+              aria-label="Exportar contatos para Excel"
+            >
+              <Upload size={18} className="rotate-180" />
+              Exportar Excel
+            </button>
+          </div>
 
           <div className="grid md:grid-cols-2 gap-6">
             {/* File Upload */}
@@ -881,19 +1086,42 @@ function App() {
                   </h4>
 
                   <div className="space-y-3">
-                    {Object.entries(contact.extraInfo).map(([key, value]) => (
-                      <div
-                        key={key}
-                        className="flex flex-col sm:flex-row sm:items-center gap-2 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
-                      >
-                        <span className="font-medium text-gray-700 capitalize min-w-[150px]">
-                          {key.replace(/_/g, " ")}:
-                        </span>
-                        <span className="text-gray-900 wrap-break-word flex-1">
-                          {String(value)}
-                        </span>
-                      </div>
-                    ))}
+                    {Object.entries(contact.extraInfo).map(([key, value]) => {
+                      // Verifica se é um campo de data
+                      const isDateField =
+                        key.toLowerCase().includes("data") ||
+                        key.toLowerCase().includes("date") ||
+                        key.toLowerCase().includes("envio");
+
+                      // Verifica se é um campo de valor/moeda
+                      const isCurrencyField =
+                        key.toLowerCase().includes("volume") ||
+                        key.toLowerCase().includes("valor") ||
+                        key.toLowerCase().includes("preco") ||
+                        key.toLowerCase().includes("preço");
+
+                      // Formata o valor conforme o tipo de campo
+                      let displayValue = String(value);
+                      if (isDateField) {
+                        displayValue = formatExcelDate(value);
+                      } else if (isCurrencyField) {
+                        displayValue = formatCurrency(value);
+                      }
+
+                      return (
+                        <div
+                          key={key}
+                          className="flex flex-col sm:flex-row sm:items-center gap-2 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+                        >
+                          <span className="font-medium text-gray-700 capitalize min-w-[150px]">
+                            {key.replace(/_/g, " ")}:
+                          </span>
+                          <span className="text-gray-900 wrap-break-word flex-1">
+                            {displayValue}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* Botão de Fechar */}
