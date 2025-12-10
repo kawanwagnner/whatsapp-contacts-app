@@ -62,8 +62,10 @@ const formatPhone = (phone: string) => {
 };
 
 const replacePlaceholders = (template: string, contact: Contact) => {
+  const firstName = contact.name.split(" ")[0];
   return template
     .replace(/{name}/g, contact.name)
+    .replace(/{firstName}/g, firstName)
     .replace(/{phone}/g, contact.phone);
 };
 
