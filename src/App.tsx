@@ -18,6 +18,8 @@ type ContactStatus =
   | "Mensagem enviada"
   | "Aguardando resposta"
   | "Respondido"
+  | "Autoriza contato do parceiro"
+  | "NÃO autoriza contato do parceiro"
   | "Outro";
 
 interface Contact {
@@ -496,6 +498,10 @@ function App() {
       "Mensagem enviada": "bg-blue-100 text-blue-700 border-blue-300",
       "Aguardando resposta": "bg-yellow-100 text-yellow-700 border-yellow-300",
       Respondido: "bg-green-100 text-green-700 border-green-300",
+      "Autoriza contato do parceiro":
+        "bg-teal-100 text-teal-700 border-teal-300",
+      "NÃO autoriza contato do parceiro":
+        "bg-red-100 text-red-700 border-red-300",
       Outro: "bg-purple-100 text-purple-700 border-purple-300",
     };
     return colors[status];
@@ -978,6 +984,12 @@ function App() {
                           Aguardando resposta
                         </option>
                         <option value="Respondido">Respondido</option>
+                        <option value="Autoriza contato do parceiro">
+                          Autoriza contato do parceiro
+                        </option>
+                        <option value="NÃO autoriza contato do parceiro">
+                          NÃO autoriza contato do parceiro
+                        </option>
                         <option value="Outro">Outro</option>
                       </select>
 
