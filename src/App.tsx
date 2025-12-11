@@ -13,7 +13,6 @@ import {
 import * as XLSX from "xlsx";
 import * as XLSXStyle from "xlsx-js-style";
 
-// Types
 type ContactStatus =
   | "Pendente"
   | "Mensagem enviada"
@@ -159,7 +158,6 @@ function App() {
   const [newContactPhone, setNewContactPhone] = useState("");
   const [, setUpdateTrigger] = useState(0);
 
-  // Atualizar exibição do tempo a cada segundo
   useEffect(() => {
     const interval = setInterval(() => {
       setUpdateTrigger((prev) => prev + 1);
@@ -167,7 +165,6 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Load from localStorage
   useEffect(() => {
     try {
       const savedContacts = localStorage.getItem("contacts_v1");
@@ -297,7 +294,6 @@ function App() {
 
             try {
               const extraInfo: Record<string, any> = {};
-              // Usar headers ORIGINAIS (não lowercase) para preservar case
               const originalHeaders = jsonData[0].map((h: any) =>
                 String(h).trim()
               );
@@ -1145,20 +1141,17 @@ function App() {
 
                   <div className="space-y-3">
                     {Object.entries(contact.extraInfo).map(([key, value]) => {
-                      // Verifica se é um campo de data
                       const isDateField =
                         key.toLowerCase().includes("data") ||
                         key.toLowerCase().includes("date") ||
                         key.toLowerCase().includes("envio");
 
-                      // Verifica se é um campo de valor/moeda
                       const isCurrencyField =
                         key.toLowerCase().includes("volume") ||
                         key.toLowerCase().includes("valor") ||
                         key.toLowerCase().includes("preco") ||
                         key.toLowerCase().includes("preço");
 
-                      // Formata o valor conforme o tipo de campo
                       let displayValue = String(value);
                       if (isDateField) {
                         displayValue = formatExcelDate(value);
