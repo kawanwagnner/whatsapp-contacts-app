@@ -29,6 +29,7 @@ interface Contact {
   customMessage?: string;
   timerActive?: boolean;
   extraInfo?: Record<string, any>;
+  statusUpdatedAt?: number;
 }
 
 const generateId = () =>
@@ -115,6 +116,30 @@ const formatCurrency = (value: any): string => {
   });
 };
 
+const formatTimeAgo = (timestamp?: number): string => {
+  if (!timestamp) return "";
+
+  const now = Date.now();
+  const diff = now - timestamp;
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  const weeks = Math.floor(days / 7);
+  const months = Math.floor(days / 30);
+  const years = Math.floor(days / 365);
+
+  if (years > 1) return "+1a";
+  if (years === 1) return "1 ano";
+  if (months >= 1) return `${months}mes`;
+  if (weeks >= 1) return `${weeks}sem`;
+  if (days >= 1) return `${days}d`;
+  if (hours >= 1) return `${hours}hrs`;
+  if (minutes >= 1) return `${minutes}min`;
+  if (seconds >= 1) return `${seconds}s`;
+  return "agora";
+};
+
 function App() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [defaultMessage, setDefaultMessage] = useState(
@@ -132,6 +157,15 @@ function App() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newContactName, setNewContactName] = useState("");
   const [newContactPhone, setNewContactPhone] = useState("");
+  const [, setUpdateTrigger] = useState(0);
+
+  // Atualizar exibição do tempo a cada segundo
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setUpdateTrigger((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Load from localStorage
   useEffect(() => {
@@ -199,6 +233,7 @@ function App() {
           phone: cleanPhoneNumber(item.phone),
           status: "Pendente" as ContactStatus,
           customMessage: item.customMessage,
+          statusUpdatedAt: Date.now(),
         };
       });
     } catch (err) {
@@ -286,6 +321,7 @@ function App() {
                 status: "Pendente" as ContactStatus,
                 extraInfo:
                   Object.keys(extraInfo).length > 0 ? extraInfo : undefined,
+                statusUpdatedAt: Date.now(),
               });
             } catch (err) {
               errors.push(
@@ -386,6 +422,7 @@ function App() {
               ...contact,
               status: "Aguardando resposta",
               timerActive: false,
+              statusUpdatedAt: Date.now(),
             };
           }
           return contact;
@@ -408,7 +445,12 @@ function App() {
       prev.map((c) => {
         if (c.id === contact.id) {
           startTimer(contact.id);
-          return { ...c, status: "Mensagem enviada", timerActive: true };
+          return {
+            ...c,
+            status: "Mensagem enviada",
+            timerActive: true,
+            statusUpdatedAt: Date.now(),
+          };
         }
         return c;
       })
@@ -419,7 +461,14 @@ function App() {
   const updateStatus = (contactId: string, newStatus: ContactStatus) => {
     setContacts((prev) =>
       prev.map((c) =>
-        c.id === contactId ? { ...c, status: newStatus, timerActive: false } : c
+        c.id === contactId
+          ? {
+              ...c,
+              status: newStatus,
+              timerActive: false,
+              statusUpdatedAt: Date.now(),
+            }
+          : c
       )
     );
     setHasChanges(true);
@@ -500,6 +549,7 @@ function App() {
         phone: cleanPhoneNumber(newContactPhone),
         status: "Pendente",
         extraInfo,
+        statusUpdatedAt: Date.now(),
       };
 
       setContacts((prev) => [newContact, ...prev]);
@@ -905,6 +955,12 @@ function App() {
 
                     {/* Status */}
                     <div className="flex items-center gap-3">
+                      {contact.statusUpdatedAt &&
+                        contact.status !== "Pendente" && (
+                          <span className="text-xs text-gray-500 font-medium">
+                            {formatTimeAgo(contact.statusUpdatedAt)}
+                          </span>
+                        )}
                       <select
                         value={contact.status}
                         onChange={(e) =>
