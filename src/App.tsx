@@ -596,6 +596,7 @@ function App() {
       const exportData = contacts.map((contact) => {
         const rowData: Record<string, any> = {};
         let followUpAdded = false;
+        let nomeAdded = false;
 
         if (contact.extraInfo) {
           Object.entries(contact.extraInfo).forEach(([key, value]) => {
@@ -605,6 +606,10 @@ function App() {
               lowerKey.includes("follow up") ||
               lowerKey.includes("followup")
             ) {
+              return;
+            }
+
+            if (lowerKey === "nome" || lowerKey === "telefone") {
               return;
             }
 
@@ -624,11 +629,25 @@ function App() {
 
             rowData[originalKey] = formattedValue;
 
+            if (
+              (lowerKey.includes("e-mail") || lowerKey.includes("email")) &&
+              !nomeAdded
+            ) {
+              rowData["Nome"] = contact.name;
+              rowData["Telefone"] = contact.phone;
+              nomeAdded = true;
+            }
+
             if (lowerKey.includes("volume") && !followUpAdded) {
               rowData["Follow UP - 18-11-2025"] = contact.status;
               followUpAdded = true;
             }
           });
+        }
+
+        if (!nomeAdded) {
+          rowData["Nome"] = contact.name;
+          rowData["Telefone"] = contact.phone;
         }
 
         if (!followUpAdded) {
