@@ -20,6 +20,8 @@ type ContactStatus =
   | "Respondido"
   | "Autoriza contato do parceiro"
   | "NÃO autoriza contato do parceiro"
+  | "LEAD QUALIFICADO"
+  | "LEAD NÃO QUALIFICADO"
   | "Outro";
 
 interface Contact {
@@ -502,6 +504,8 @@ function App() {
         "bg-teal-100 text-teal-700 border-teal-300",
       "NÃO autoriza contato do parceiro":
         "bg-red-100 text-red-700 border-red-300",
+      "LEAD QUALIFICADO": "bg-emerald-100 text-emerald-700 border-emerald-300",
+      "LEAD NÃO QUALIFICADO": "bg-orange-100 text-orange-700 border-orange-300",
       Outro: "bg-purple-100 text-purple-700 border-purple-300",
     };
     return colors[status];
@@ -989,6 +993,12 @@ function App() {
                         </option>
                         <option value="NÃO autoriza contato do parceiro">
                           NÃO autoriza contato do parceiro
+                        </option>
+                        <option value="LEAD QUALIFICADO">
+                          LEAD QUALIFICADO
+                        </option>
+                        <option value="LEAD NÃO QUALIFICADO">
+                          LEAD NÃO QUALIFICADO
                         </option>
                         <option value="Outro">Outro</option>
                       </select>
